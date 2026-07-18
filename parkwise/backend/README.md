@@ -36,6 +36,17 @@ Server runs at `http://localhost:5000`. Health check: `GET /api/health`.
 | GET  | /api/parking-lots/:lotId/slots?status=&vehicleType= | Public | List slots |
 
 First admin: `node src/utils/seedAdmin.js "Name" email password`
+
+## Module 3: Booking (adds)
+
+| Method | Route | Access | Description |
+|---|---|---|---|
+| POST | /api/bookings | Customer | Create a booking (auto-computes totalAmount, blocks overlaps) |
+| GET  | /api/bookings/my | Customer | Own booking history |
+| GET  | /api/bookings/owner | Owner | All bookings across owned lots |
+| GET  | /api/bookings/:id | Booking's customer / lot owner / admin | Booking detail |
+| PATCH | /api/bookings/:id/cancel | Customer (own booking) | Cancel a pending/confirmed booking |
+| PATCH | /api/bookings/:id/status | Owner/admin | Change status (confirmed/completed/cancelled) — will be automated by Payment module next |
 | POST   | /api/auth/forgot-password           | Public  | Generate reset token     |
 | POST   | /api/auth/reset-password/:token     | Public  | Set new password         |
 
