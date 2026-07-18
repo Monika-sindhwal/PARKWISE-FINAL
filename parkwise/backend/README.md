@@ -47,6 +47,16 @@ First admin: `node src/utils/seedAdmin.js "Name" email password`
 | GET  | /api/bookings/:id | Booking's customer / lot owner / admin | Booking detail |
 | PATCH | /api/bookings/:id/cancel | Customer (own booking) | Cancel a pending/confirmed booking |
 | PATCH | /api/bookings/:id/status | Owner/admin | Change status (confirmed/completed/cancelled) — will be automated by Payment module next |
+
+## Module 4: Payment (adds)
+
+| Method | Route | Access | Description |
+|---|---|---|---|
+| POST | /api/payments/create-order | Customer (own booking) | Creates a Razorpay order for a pending, unpaid booking |
+| POST | /api/payments/verify | Customer | Verifies payment signature; on success sets booking to `paid`/`confirmed` |
+| GET  | /api/payments/booking/:bookingId | Customer/lot owner/admin | View payment for a booking |
+
+**Test mode by default:** if `RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET` aren't set in `.env` (or `NODE_ENV=test`), a mock Razorpay client is used automatically — `npm test` and local dev both work with zero setup, no real Razorpay account needed yet. Add real test-mode keys from the [Razorpay dashboard](https://dashboard.razorpay.com/app/keys) whenever you're ready to test the real checkout flow.
 | POST   | /api/auth/forgot-password           | Public  | Generate reset token     |
 | POST   | /api/auth/reset-password/:token     | Public  | Set new password         |
 
