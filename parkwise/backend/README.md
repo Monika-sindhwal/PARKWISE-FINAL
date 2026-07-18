@@ -66,6 +66,16 @@ First admin: `node src/utils/seedAdmin.js "Name" email password`
 | POST | /api/bookings/verify-qr | Owner/admin | Scans/verifies a QR code, records `checkInTime` on first scan |
 
 The QR encodes a signed JWT (not a plain booking ID), so it can't be forged. It uses `QR_SECRET` if set, otherwise falls back to `JWT_SECRET`.
+
+## Module 6: Dashboards (adds)
+
+| Method | Route | Access | Description |
+|---|---|---|---|
+| GET | /api/dashboard/customer | Customer | Upcoming bookings, history, total spent |
+| GET | /api/dashboard/owner | Owner | Total bookings, revenue, available/occupied slot counts across owned lots |
+| GET | /api/dashboard/admin | Admin | Platform-wide totals: users, lots, bookings, revenue, lots-by-status, users-by-role |
+
+No new dependencies in this module.
 | POST   | /api/auth/forgot-password           | Public  | Generate reset token     |
 | POST   | /api/auth/reset-password/:token     | Public  | Set new password         |
 

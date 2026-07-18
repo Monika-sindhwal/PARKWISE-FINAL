@@ -6,6 +6,7 @@ const authRoutes = require("./routes/auth.routes");
 const parkingLotRoutes = require("./routes/parkingLot.routes");
 const bookingRoutes = require("./routes/booking.routes");
 const paymentRoutes = require("./routes/payment.routes");
+const dashboardRoutes = require("./routes/dashboard.routes");
 const errorHandler = require("./middlewares/error.middleware");
 
 const app = express();
@@ -27,6 +28,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/parking-lots", parkingLotRoutes);
 app.use("/api/bookings", bookingRoutes);
 app.use("/api/payments", paymentRoutes);
+app.use("/api/dashboard", dashboardRoutes);
 
 // 404 handler for unknown routes
 app.use((req, res) => {
