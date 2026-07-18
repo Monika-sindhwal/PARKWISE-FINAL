@@ -270,3 +270,164 @@ describe("Booking Module", () => {
     expect(res.statusCode).toBe(400);
   });
 });
+
+describe("QR Code Module", () => {
+  test("cannot generate a QR code for a pending (unpaid) booking", async () => {
+    const { lotId, slotId } = await setupApprovedLotWithSlot();
+    const { token: customerToken } = await registerUser({ role: "customer" });
+
+    const booking = await request(app)
+      .post("/api/bookings")
+      .set("Authorization", `Bearer ${customerToken}`)
+      .send({ parkingLotId: lotId, slotId, entryTime: hour(10), exitTime: hour(13) });
+
+    const res = await request(app)
+      .get(`/api/bookings/${booking.body.booking._id}/qr`)
+      .set("Authorization", `Bearer ${customerToken}`);
+
+    expect(res.statusCode).toBe(400);
+  });
+
+  test("customer can generate a QR code once booking is confirmed", async () => {
+    const { ownerToken, lotId, slotId } = await setupApprovedLotWithSlot();
+    const { token: customerToken } = await registerUser({ role: "customer" });
+
+    const booking = await request(app)
+      .post("/api/bookings")
+      .set("Authorization", `Bearer ${customerToken}`)
+      .send({ parkingLotId: lotId, slotId, entryTime: hour(10), exitTime: hour(13) });
+
+    // Simulate a confirmed booking (Module 4 payment normally does this)
+    await request(app)
+      .patch(`/api/bookings/${booking.body.booking._id}/status`)
+      .set("Authorization", `Bearer ${ownerToken}`)
+      .send({ status: "confirmed" });
+
+    const res = await request(app)
+      .get(`/api/bookings/${booking.body.booking._id}/qr`)
+      .set("Authorization", `Bearer ${customerToken}`);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body.qrToken).toBeDefined();
+    expect(res.body.qrImage).toMatch(/^data:image\/png;base64,/);
+  });
+
+  test("someone else cannot generate a QR code for another customer's booking", async () => {
+    const { ownerToken, lotId, slotId } = await setupApprovedLotWithSlot();
+    const { token: customerToken } = await registerUser({ role: "customer" });
+    const { token: strangerToken } = await registerUser({ role: "customer" });
+
+    const booking = await request(app)
+      .post("/api/bookings")
+      .set("Authorization", `Bearer ${customerToken}`)
+      .send({ parkingLotId: lotId, slotId, entryTime: hour(10), exitTime: hour(13) });
+
+    await request(app)
+      .patch(`/api/bookings/${booking.body.booking._id}/status`)
+      .set("Authorization", `Bearer ${ownerToken}`)
+      .send({ status: "confirmed" });
+
+    const res = await request(app)
+      .get(`/api/bookings/${booking.body.booking._id}/qr`)
+      .set("Authorization", `Bearer ${strangerToken}`);
+
+    expect(res.statusCode).toBe(403);
+  });
+
+  test("owner can verify a valid QR code and check-in is recorded", async () => {
+    const { ownerToken, lotId, slotId } = await setupApprovedLotWithSlot();
+    const { token: customerToken } = await registerUser({ role: "customer" });
+
+    const booking = await request(app)
+      .post("/api/bookings")
+      .set("Authorization", `Bearer ${customerToken}`)
+      .send({ parkingLotId: lotId, slotId, entryTime: hour(10), exitTime: hour(13) });
+
+    await request(app)
+      .patch(`/api/bookings/${booking.body.booking._id}/status`)
+      .set("Authorization", `Bearer ${ownerToken}`)
+      .send({ status: "confirmed" });
+
+    const qrRes = await request(app)
+      .get(`/api/bookings/${booking.body.booking._id}/qr`)
+      .set("Authorization", `Bearer ${customerToken}`);
+
+    const verifyRes = await request(app)
+      .post("/api/bookings/verify-qr")
+      .set("Authorization", `Bearer ${ownerToken}`)
+      .send({ qrToken: qrRes.body.qrToken });
+
+    expect(verifyRes.statusCode).toBe(200);
+    expect(verifyRes.body.booking.checkInTime).toBeDefined();
+  });
+
+  test("re-scanning an already checked-in QR code reports it instead of erroring", async () => {
+    const { ownerToken, lotId, slotId } = await setupApprovedLotWithSlot();
+    const { token: customerToken } = await registerUser({ role: "customer" });
+
+    const booking = await request(app)
+      .post("/api/bookings")
+      .set("Authorization", `Bearer ${customerToken}`)
+      .send({ parkingLotId: lotId, slotId, entryTime: hour(10), exitTime: hour(13) });
+
+    await request(app)
+      .patch(`/api/bookings/${booking.body.booking._id}/status`)
+      .set("Authorization", `Bearer ${ownerToken}`)
+      .send({ status: "confirmed" });
+
+    const qrRes = await request(app)
+      .get(`/api/bookings/${booking.body.booking._id}/qr`)
+      .set("Authorization", `Bearer ${customerToken}`);
+
+    await request(app)
+      .post("/api/bookings/verify-qr")
+      .set("Authorization", `Bearer ${ownerToken}`)
+      .send({ qrToken: qrRes.body.qrToken });
+
+    const secondScan = await request(app)
+      .post("/api/bookings/verify-qr")
+      .set("Authorization", `Bearer ${ownerToken}`)
+      .send({ qrToken: qrRes.body.qrToken });
+
+    expect(secondScan.statusCode).toBe(200);
+    expect(secondScan.body.alreadyCheckedIn).toBe(true);
+  });
+
+  test("a tampered QR token is rejected", async () => {
+    const { ownerToken } = await setupApprovedLotWithSlot();
+
+    const res = await request(app)
+      .post("/api/bookings/verify-qr")
+      .set("Authorization", `Bearer ${ownerToken}`)
+      .send({ qrToken: "this.is.not.a.valid.token" });
+
+    expect(res.statusCode).toBe(400);
+  });
+
+  test("an owner from a different lot cannot verify this booking's QR", async () => {
+    const { ownerToken, lotId, slotId } = await setupApprovedLotWithSlot();
+    const { token: customerToken } = await registerUser({ role: "customer" });
+    const { token: otherOwnerToken } = await registerUser({ role: "owner" });
+
+    const booking = await request(app)
+      .post("/api/bookings")
+      .set("Authorization", `Bearer ${customerToken}`)
+      .send({ parkingLotId: lotId, slotId, entryTime: hour(10), exitTime: hour(13) });
+
+    await request(app)
+      .patch(`/api/bookings/${booking.body.booking._id}/status`)
+      .set("Authorization", `Bearer ${ownerToken}`)
+      .send({ status: "confirmed" });
+
+    const qrRes = await request(app)
+      .get(`/api/bookings/${booking.body.booking._id}/qr`)
+      .set("Authorization", `Bearer ${customerToken}`);
+
+    const res = await request(app)
+      .post("/api/bookings/verify-qr")
+      .set("Authorization", `Bearer ${otherOwnerToken}`)
+      .send({ qrToken: qrRes.body.qrToken });
+
+    expect(res.statusCode).toBe(403);
+  });
+});

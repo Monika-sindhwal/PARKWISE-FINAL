@@ -57,6 +57,15 @@ First admin: `node src/utils/seedAdmin.js "Name" email password`
 | GET  | /api/payments/booking/:bookingId | Customer/lot owner/admin | View payment for a booking |
 
 **Test mode by default:** if `RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET` aren't set in `.env` (or `NODE_ENV=test`), a mock Razorpay client is used automatically — `npm test` and local dev both work with zero setup, no real Razorpay account needed yet. Add real test-mode keys from the [Razorpay dashboard](https://dashboard.razorpay.com/app/keys) whenever you're ready to test the real checkout flow.
+
+## Module 5: QR Code (adds)
+
+| Method | Route | Access | Description |
+|---|---|---|---|
+| GET | /api/bookings/:id/qr | Customer (own booking) | Generates a signed-token QR code — only for `confirmed` bookings |
+| POST | /api/bookings/verify-qr | Owner/admin | Scans/verifies a QR code, records `checkInTime` on first scan |
+
+The QR encodes a signed JWT (not a plain booking ID), so it can't be forged. It uses `QR_SECRET` if set, otherwise falls back to `JWT_SECRET`.
 | POST   | /api/auth/forgot-password           | Public  | Generate reset token     |
 | POST   | /api/auth/reset-password/:token     | Public  | Set new password         |
 

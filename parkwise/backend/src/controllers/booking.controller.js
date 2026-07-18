@@ -1,3 +1,5 @@
+const jwt = require("jsonwebtoken");
+const QRCode = require("qrcode");
 const Booking = require("../models/Booking");
 const ParkingSlot = require("../models/ParkingSlot");
 const ParkingLot = require("../models/ParkingLot");
@@ -236,6 +238,116 @@ const updateBookingStatus = async (req, res, next) => {
   }
 };
 
+// @route   GET /api/bookings/:id/qr
+// @access  Private (the customer who made the booking)
+// Only available once the booking is confirmed (paid) - see Module 4.
+const generateBookingQr = async (req, res, next) => {
+  try {
+    const booking = await Booking.findById(req.params.id);
+
+    if (!booking) {
+      return res.status(404).json({ success: false, message: "Booking not found" });
+    }
+
+    if (booking.userId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: "You can only generate a QR code for your own booking",
+      });
+    }
+
+    if (booking.bookingStatus !== "confirmed") {
+      return res.status(400).json({
+        success: false,
+        message: `QR code is only available for confirmed bookings (current status: ${booking.bookingStatus})`,
+      });
+    }
+
+    // Signed token - not just the raw booking ID - so it can't be forged.
+    // Uses a separate secret from user-auth JWTs; falls back to JWT_SECRET if unset.
+    const secret = process.env.QR_SECRET || process.env.JWT_SECRET;
+    const qrToken = jwt.sign({ bookingId: booking._id.toString() }, secret, {
+      expiresIn: "1d",
+    });
+
+    const qrImage = await QRCode.toDataURL(qrToken);
+
+    res.status(200).json({ success: true, qrToken, qrImage });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @route   POST /api/bookings/verify-qr
+// @access  Private (owner or admin - scanning at the entrance)
+const verifyBookingQr = async (req, res, next) => {
+  try {
+    const { qrToken } = req.body;
+
+    if (!qrToken) {
+      return res.status(400).json({ success: false, message: "qrToken is required" });
+    }
+
+    const secret = process.env.QR_SECRET || process.env.JWT_SECRET;
+    let decoded;
+    try {
+      decoded = jwt.verify(qrToken, secret);
+    } catch (err) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid or expired QR code",
+      });
+    }
+
+    const booking = await Booking.findById(decoded.bookingId)
+      .populate("parkingLotId", "name ownerId")
+      .populate("userId", "name email vehicleNumber")
+      .populate("slotId", "slotNumber vehicleType");
+
+    if (!booking) {
+      return res.status(404).json({ success: false, message: "Booking not found" });
+    }
+
+    const isLotOwner =
+      booking.parkingLotId.ownerId.toString() === req.user._id.toString();
+    const isAdmin = req.user.role === "admin";
+
+    if (!isLotOwner && !isAdmin) {
+      return res.status(403).json({
+        success: false,
+        message: "This booking belongs to a different parking lot",
+      });
+    }
+
+    if (booking.bookingStatus === "cancelled") {
+      return res.status(400).json({ success: false, message: "This booking was cancelled" });
+    }
+
+    if (booking.bookingStatus !== "confirmed") {
+      return res.status(400).json({
+        success: false,
+        message: `This booking is not currently valid for entry (status: ${booking.bookingStatus})`,
+      });
+    }
+
+    if (booking.checkInTime) {
+      return res.status(200).json({
+        success: true,
+        alreadyCheckedIn: true,
+        message: `Already checked in at ${booking.checkInTime.toISOString()}`,
+        booking,
+      });
+    }
+
+    booking.checkInTime = new Date();
+    await booking.save();
+
+    res.status(200).json({ success: true, message: "Entry verified", booking });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   createBooking,
   getMyBookings,
@@ -243,4 +355,6 @@ module.exports = {
   getBookingById,
   cancelBooking,
   updateBookingStatus,
+  generateBookingQr,
+  verifyBookingQr,
 };

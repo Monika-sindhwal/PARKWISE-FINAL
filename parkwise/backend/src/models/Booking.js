@@ -40,6 +40,11 @@ const bookingSchema = new mongoose.Schema(
       required: true,
       min: 0,
     },
+    // Set the first time this booking's QR code is successfully scanned
+    // at the parking entrance (see Module 5: QR Code)
+    checkInTime: {
+      type: Date,
+    },
   },
   { timestamps: true }
 );
