@@ -1,0 +1,41 @@
+@import "tailwindcss";
+
+:root {
+  /* Palette grounded in real parking signage & availability signals,
+     not a generic AI-default palette. */
+  --color-bg: #F4F5F7;          /* concrete grey */
+  --color-surface: #FFFFFF;
+  --color-ink: #14181F;         /* asphalt charcoal */
+  --color-ink-muted: #5B6472;
+  --color-primary: #2C4BDB;     /* international parking-sign blue */
+  --color-primary-dark: #1F37A8;
+  --color-available: #16A34A;   /* green slot light */
+  --color-occupied: #DC2626;    /* red slot light */
+  --color-accent: #F5A524;      /* ticket-stripe amber */
+  --color-border: #E2E5EA;
+
+  --font-display: 'Space Grotesk', sans-serif;
+  --font-body: 'Inter', sans-serif;
+}
+
+body {
+  background-color: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+}
+
+h1, h2, h3, .font-display {
+  font-family: var(--font-display);
+}
+
+/* Hazard-stripe accent - the signature motif, used sparingly */
+.stripe-accent {
+  height: 4px;
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--color-accent),
+    var(--color-accent) 10px,
+    var(--color-ink) 10px,
+    var(--color-ink) 20px
+  );
+}
